@@ -68,12 +68,13 @@ class Alien:
             vy = -self.dive_speed
             
             # Horizontal motion tracks target_x
-            dx = self.target_x - self.x
-            vx = dx * 4.0
-            if vx > self.dive_speed:
-                vx = self.dive_speed
-            elif vx < -self.dive_speed:
-                vx = -self.dive_speed
+            time_to_ground = max(0.1, self.y / self.dive_speed)
+            vx = (self.target_x - self.x) / time_to_ground
+            max_vx = self.dive_speed * 1.5
+            if vx > max_vx:
+                vx = max_vx
+            elif vx < -max_vx:
+                vx = -max_vx
             
             self.x += vx * dt
             self.y += vy * dt
