@@ -1,109 +1,122 @@
 # <img src="server/viewer/favicon.svg" alt="logo" width="128" height="128" align="middle"> SI2 - Space Invaders
 
-A Space Invaders game implementation using the `ai-game-framework`.
+# Agente Inteligente para Space Invaders (NEAT)
 
-## Features
-- Real-time backend server.
-- Web-based viewer with Canvas API.
-- Dummy agent (random walker/shooter).
-- Manual agent (terminal-based A/D/Space control).
+Este repositório contém a implementação de um agente autónomo para o jogo Space Invaders, desenvolvido para a unidade curricular de Sistemas Inteligentes II. O agente utiliza Neuroevolução (**NEAT**) para dominar o jogo através de sensores customizados e uma função de fitness evolutiva.
 
-## Setup & Running the Game
+## 1. Instruções de Execução
 
-### 1. Prerequisites
-- Python 3.10+ installed on your host.
+### Pré-requisitos
 
-### 2. Create and Activate Virtual Environment
-Create a virtual environment (`venv`) to isolate dependencies:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+- Python 3.10+
+- `pip install -r requirements.txt` (inclui `neat-python`, `numpy` e `matplotlib`)
 
-### 3. Install Dependencies
-Install the required packages (this will install the local `ai-game-framework` package in editable mode and `numpy`):
-```bash
-pip install -r requirements.txt
-```
+### Como correr o agente
 
-### 4. Run the Game Server
-Start the backend server (which also serves the frontend web viewer):
-```bash
-python3 -m server.server
-```
+1. Iniciar o servidor:
 
-### 5. Open the Viewer
-Open your web browser and navigate to:
-```
-http://localhost:8765/
-```
+   ```bash
+   python3 -m server.server
+   ```
 
-### 6. Run the Agents
-In a separate terminal (ensure the virtual environment is activated):
+2. Num novo terminal, carregar o modelo treinado:
 
-- **Dummy Agent**:
-  ```bash
-  python3 -m agents.dummy_agent
-  ```
+   ```bash
+   python3 -m agents.ml_agent
+   ```
 
-- **Manual Agent (Terminal A/D/Space control)**:
-  ```bash
-  python3 -m agents.manual_agent
-  ```
-
-## Development
-The project structure:
-- `server/`: Game logic, server implementation, and visualizer assets (inside `server/viewer/`).
-- `agents/`: Autonomous and manual agent implementations.
-- `tests/`: Game unit tests.
-
-
-
-# Relatório de Desenvolvimento: Agente Espacial (NEAT)
-
-## 1. Arquitetura do Agente
-O agente foi treinado utilizando o algoritmo **NEAT** (NeuroEvolution of Augmenting Topologies).
-*   **Inputs (11):** Posição X do jogador, presença de laser, coordenadas (X, Y) do laser ativo, coordenadas do alien estático mais próximo, coordenadas do alien em mergulho (*dive*) mais próximo, densidade de aliens e o **Sensor de Cooldown da Arma** (essencial para evitar o bloqueio de movimento durante o disparo).
-*   **Outputs (4):** Mover para Oeste, Mover para Este, Disparar, *Idle* (Ficar parado).
-*   **Processamento:** Utilização de `ParallelEvaluator` com 3 processos em simultâneo para otimização do tempo de treino num CPU i7-1165G7.
-
-## 2. Função Base de Recompensa (Fitness)
-A função inicial foi desenhada para equilibrar sobrevivência e agressividade:
-$$Fitness = (Score \times 5.0) + (Steps \times 0.1) - (VidasPerdidas \times 500)$$
-*   **Score:** Incentiva a eliminação de aliens.
-*   **Steps:** Recompensa a sobrevivência no tempo.
-*   **Penalização de Morte:** Um peso negativo elevado para desencorajar comportamentos suicidas ou estáticos.
+*Nota: O agente carrega por defeito o ficheiro `winner.pkl` na raiz do projeto.*
 
 ---
 
-## 3. Histórico de Versões e Evolução
+## 2. Arquitetura da Solução
+
+O primeiro modelo criado é composto por apenas 2 camadas, input e output, de tamanhos 11 e 4 respetivamente. Já o segundo modelo introduziu uma camada intermédia
+
+### Representação do Estado (11 Inputs)
+
+Para permitir que uma rede simples aprenda comportamentos complexos, os inputs foram pré-processados:
+
+- **Posição Relativa:** Coordenadas X e Y do jogador e dos projéteis.
+
+- **Sensor de Cooldown:** Input booleano (0 ou 1) que indica se a arma está pronta a disparar. Este sensor foi crítico para evitar que o agente ficasse "preso" a tentar disparar sem se mover.
+
+- **Gestão de Ameaças:** Coordenadas do alien mais baixo em modo *dive* (prioridade de defesa) e do alien estático mais próximo (prioridade de ataque).
+
+- **Discretização:** Aplicação de `round()` nas coordenadas para eliminar oscilações (*jitter*) causadas pela diferença entre o movimento discreto da nave e o contínuo dos aliens.
+
+### Modelo Neural
+
+- **Algoritmo:** NEAT (NeuroEvolution of Augmenting Topologies).
+
+- **Topologia Final:** 11 inputs, 4 outputs, **0 camadas escondidas**.
+
+- **Justificação:** A engenharia de features robusta permitiu uma solução linear eficiente, minimizando o custo computacional e garantindo maior fiabilidade no servidor real.
+
+---
+
+## 3. Funções de Recompensa (Reward Shaping)
+
+A evolução do agente foi dividida em fases de **Fine-Tuning**, onde cada nova versão partia do "campeão" da fase anterior.
 
 ### Fase 0: Modelo Base (`winner_goated_behaviour.pkl`)
-*   **Comportamento:** Modelo defensivo e estável.
-*   **Destaque:** Aprendeu a "caçar" aliens que entram em modo *dive*, movendo-se para a sua coordenada X para interceptar o ataque.
-*   **Problema Detetado:** O agente tendia a ficar parado no centro (*Camping*), pois os aliens acabavam sempre por passar pela sua linha de fogo.
 
-### Fase 1: Introdução do Paradigma "Speedrun"
-*   **Alteração:** Substituição da recompensa de tempo por uma penalização: $-(steps \times k)$.
-*   **Objetivo:** Forçar o agente a limpar as *waves* o mais rápido possível para minimizar a perda de pontos por tempo decorrido. Foram testados dois coeficientes ($k=0.75$ e $k=1.0$).
+O treino inicial focou-se na sobrevivência básica com a função:
+$$Fitness = (Score \times 10) + (Steps \times 0.5) - (VidasPerdidas \times 500)$$
 
-### Fase 2: Expansão de Contexto e Modo Caçador
-*   **Alterações:** 
-    1. Aumento do limite de simulação para **6000 steps** (3 minutos) para testar a robustez contra o RNG.
-    2. Introdução de bónus por alinhamento com aliens estáticos (Modo Caçador) quando não existem ameaças em *dive*.
-*   **Resultado:** O agente tornou-se mais dinâmico, patrulhando a base para eliminar alvos antes de estes iniciarem o ataque.
+- **Resultado:** O agente aprendeu a caçar aliens em *dive*.
+- **Problema:** O comportamento era passivo. O agente encostava-se ao lado esquerdo quando o ecrã estava seguro, tornando-se vulnerável a ataques vindos do lado oposto.
+
+### Fase 1: Paradigma "Speedrun"
+
+Para aumentar a agressividade, mudámos a recompensa de tempo por uma penalização. O objetivo passou a ser limpar a ronda o mais rápido possível.
+$$Fitness = (Score \times 10) - (Steps \times k) - (VidasPerdidas \times 500)$$
+
+- Foram testados dois coeficientes: $k=0.75$ e $k=1.0$ (denominados `winner_k_vi.pkl`, sendo $i$ a versão/fase de desenvolvimento).
+- **Resultado:** O agente tornou-se muito mais decisivo nos disparos para "parar o cronómetro".
+
+### Fase 2: Modo Caçador e Robustez
+
+Introduzimos o bónus por alinhamento com aliens estáticos quando não havia ameaças imediatas e aumentámos o limite de treino para 6000 steps.
+
+- **Objetivo:** Garantir que o agente caça ativamente a "nuvem" de aliens para evitar que estes cheguem a iniciar o modo *dive*.
 
 ### Fase 3: Reforço de Prioridades e o Problema do *Jitter*
-*   **Alteração:** Aumento agressivo das recompensas de alinhamento ($0.4$ para alvos em *dive* e $1.0$ para alvos estáticos).
-*   **Problema (Local Optimum):** O modelo de $k=0.75$ desenvolveu uma oscilação constante (*jitter*). Como a nave se move em coordenadas discretas (inteiros) e os aliens em coordenadas contínuas (floats), a IA tentava infinitamente ajustar a sua posição para um valor decimal impossível de atingir.
 
-### Fase 4: Discretização de Alvos (Modelo Atual)
-*   **Solução:** Implementação da função `round()` na posição X dos aliens para o cálculo de distância.
-*   **Efeito:** Ao "discretizar" o alvo, o agente passou a considerar o alinhamento perfeito (distância = 0) assim que entra no mesmo bloco que o alien.
-*   **Resultado Final:** Movimentos fluidos, eliminação do *jitter* e comportamento tático de alta performance, alternando perfeitamente entre defesa (evasão de *dives*) e ataque agressivo.
+Aumentámos a recompensa de alinhamento ($0.4$ para alvos em *dive* e $1.0$ para estáticos).
+
+- **Problema Detetado:** O modelo de $k=0.75$ começou a "tremer" (oscilação esquerda-direita). Sendo o movimento da nave discreto (inteiros) e o dos aliens contínuo (floats), a IA tentava alinhar-se com casas decimais impossíveis de atingir.
+
+### Fase 4: Discretização e Modelo Final
+
+Aplicámos a função `round()` na posição X dos aliens para o cálculo de distância na função de fitness.
+
+- **Efeito:** O alinhamento passou a ser considerado perfeito assim que o agente entra no mesmo "bloco" que o alien.
+- **Resultado Final:** Eliminação total do tremor, movimentos fluidos e performance imbatível.
+
+### Componentes Dinâmicas
+
+- **Anti-Camping (Mapa de Calor):** Registo de permanência em cada bloco X. Se o agente passar >45% do tempo num único bloco, o fitness total sofre uma penalização de 90%.
+- **Modos de Prioridade:**
+  - **Evasão:** Bónus por distância de aliens em *dive* que estejam abaixo de $Y=4.0$.
+  - **Caçador:** Recompensa de alinhamento com aliens estáticos ($1.0$ por frame) quando não existem ameaças imediatas.
 
 ---
 
-### Notas de Engenharia (Observações Extras)
-*   **Sim2Real Gap:** A implementação de uma zona de segurança (Y < 4.0) onde o agente prioriza a evasão em vez do alinhamento foi crucial para mitigar a latência de rede (WebSockets) observada no servidor real.
-*   **Mapa de Calor (Anti-Camping):** A imposição de uma penalização de 90% no fitness caso o agente passasse mais de 45% do tempo num único bloco X foi o "golpe final" que destruiu a tática de ficar parado no centro, forçando a exploração de todo o mapa.
+## 4. Avaliação de Performance
+
+### Resultados Obtidos
+
+- **Pontuação Máxima:** 50.000+ pontos.
+- **Consistência:** O agente é capaz de sobreviver a centenas de *waves* consecutivas sem perder vidas, demonstrando uma gestão perfeita de *cooldown* e reflexos preventivos contra ataques diagonais.
+
+### Estudo de Convergência
+
+*(Podes inserir aqui os gráficos gerados pelo script: fitness_meu_modelo.png e comparativo_complexidade.png)*
+
+1. **Convergência:** O modelo atingiu o patamar de estabilidade por volta da geração 80, onde a média da população se aproximou do fitness máximo.
+2. **Eficiência Estrutural:** Ao longo das 100 gerações, observou-se uma redução no número de conexões neurais, provando que o agente aprendeu a ignorar inputs ruidosos e focou-se apenas na lógica crítica de sobrevivência.
+
+### Comparação de Abordagens
+
+Comparou-se a solução linear (11 inputs) com uma solução de camadas escondidas (2 inputs). A solução linear provou ser mais robusta, atingindo pontuações superiores e movimentos mais fluidos, enquanto a rede com camadas escondidas apresentou maior dificuldade em gerir o cooldown da arma e situações de RNG múltiplo.

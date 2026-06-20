@@ -9,6 +9,7 @@ import random
 from typing import Optional, Dict, Any
 from agents.base_agent import BaseAgent
 
+
 class DummyAgent(BaseAgent):
     async def deliberate(self) -> Optional[Dict[str, Any]]:
         if not self.current_state or self.current_state.get("game_over"):
@@ -31,10 +32,11 @@ class DummyAgent(BaseAgent):
             action = {"action": "move", "direction": "EAST"}
         elif choice == "shoot":
             action = {"action": "shoot"}
-        
+
         if action:
             logging.info(f"Deliberated action (fallback): {action}")
         return action
+
 
 if __name__ == "__main__":
     agent = DummyAgent()
