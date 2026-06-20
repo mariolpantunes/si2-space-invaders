@@ -29,35 +29,25 @@ Este repositório contém a implementação de um agente autónomo para o jogo S
 
 ---
 
-## 2. Arquitetura da Solução
+Durante o desenvolvimento, testámos duas filosofias de design distintas para o cérebro do agente:
 
-O primeiro modelo criado é composto por apenas 2 camadas, input e output, de tamanhos 11 e 4 respetivamente. Já o segundo modelo introduziu uma camada intermédia
+### Modelo A: Engenharia de Features (A Nossa Solução Final)
 
-### Representação do Estado (11 Inputs)
+- **Topologia:** 11 inputs, 4 outputs (Oeste, Este, Disparar, Idle), **0 camadas escondidas**.
+- **Inputs (11):** Coordenadas X/Y da nave e lasers; Sensor de Cooldown (disponibilidade de tiro); Ameaça prioritária (alien em *dive* mais baixo); Alvo tático (alien estático mais próximo); Densidade lateral de inimigos.
+- **Justificação:** Ao "mastigar" os dados para a IA (ex: focar no perigo iminente), permitimos que uma rede linear simples atingisse performance máxima com custo computacional mínimo.
 
-Para permitir que uma rede simples aprenda comportamentos complexos, os inputs foram pré-processados:
+### Modelo B: Complexidade Arquitetural (Modelo de Comparação)
 
-- **Posição Relativa:** Coordenadas X e Y do jogador e dos projéteis.
-
-- **Sensor de Cooldown:** Input booleano (0 ou 1) que indica se a arma está pronta a disparar. Este sensor foi crítico para evitar que o agente ficasse "preso" a tentar disparar sem se mover.
-
-- **Gestão de Ameaças:** Coordenadas do alien mais baixo em modo *dive* (prioridade de defesa) e do alien estático mais próximo (prioridade de ataque).
-
-- **Discretização:** Aplicação de `round()` nas coordenadas para eliminar oscilações (*jitter*) causadas pela diferença entre o movimento discreto da nave e o contínuo dos aliens.
-
-### Modelo Neural
-
-- **Algoritmo:** NEAT (NeuroEvolution of Augmenting Topologies).
-
-- **Topologia Final:** 11 inputs, 4 outputs, **0 camadas escondidas**.
-
-- **Justificação:** A engenharia de features robusta permitiu uma solução linear eficiente, minimizando o custo computacional e garantindo maior fiabilidade no servidor real.
+- **Topologia:** 2 inputs, 4 outputs, **1 camada escondida com 6 neurónios**.
+- **Inputs (2):** Distância relativa em X entre o alien e a nave ($alien\_x - player\_x$) e a coordenada Y do alien.
+- **Filosofia:** Fornecer dados brutos e deixar que a camada escondida descubra as correlações lógicas (como a necessidade de disparar apenas quando alinhado).
 
 ---
 
 ## 3. Funções de Recompensa (Reward Shaping)
 
-A evolução do agente foi dividida em fases de **Fine-Tuning**, onde cada nova versão partia do "campeão" da fase anterior.
+A evolução do agente A foi dividida em fases de **Fine-Tuning**, onde cada nova versão partia do "campeão" da fase anterior, enquanto que o modelo B, 
 
 ### Fase 0: Modelo Base (`winner_goated_behaviour.pkl`)
 
