@@ -34,26 +34,30 @@ class FinalAgent(BaseAgent):
         epsilon_decay: float = 0.9995,
         mode: str = "train",
         file: str = None,
-        server_uri = "ws://localhost:8765/ws"
+        server_uri = "ws://localhost:8765/ws",
 
     ) -> None:
 
         super().__init__(server_uri)
 
-        self.q_table: Dict[Tuple[bool, bool, int, int], np.ndarray] = {} # Q_table = (player_x ; has_diving_alien ; aligned ;  target_dx ; target_dy)
+        self.q_table: Dict[Tuple[bool, bool, bool, bool, int, int], np.ndarray] = {} # Q_table = (player_x ; has_diving_alien ; aligned ;  target_dx ; target_dy)
         self.lr: float = learning_rate
         self.gamma: float = discount_factor
         self.epsilon: float = epsilon
         self.epsilon_decay: float = epsilon_decay
         self.mode: str = mode
         self.file: str = file
+
+        self.current_lives: int = 3
         self.start_flag = False
+        self.number_of_run = 1
+        self.new_run = True
 
         self.previous_score: float = 0.0
-        self.previous_state: Tuple[bool, bool, int, int] = None
+        self.previous_state: Tuple[bool, bool, bool, bool, int, int] = None
         self.previous_action: int = None
 
-    def get_q_values(self, state: Tuple[bool, bool, int, int]) -> np.ndarray:
+    def get_q_values(self, state: Tuple[bool, bool, bool, bool, int, int]) -> np.ndarray:
         if state not in self.q_table:
             self.q_table[state] = np.zeros(len(ACTIONS), dtype=np.float64)
         return self.q_table[state]
@@ -61,10 +65,10 @@ class FinalAgent(BaseAgent):
 
     def learn(
         self, 
-        state: Tuple[bool, bool, int, int], 
+        state: Tuple[bool, bool, bool, bool, int, int], 
         action: int,
         reward: float, 
-        next_state: Tuple[bool, bool, int, int],
+        next_state: Tuple[bool, bool, bool, bool, int, int],
         done: bool
     ) -> None:
         
@@ -79,7 +83,7 @@ class FinalAgent(BaseAgent):
         self.q_table[state][action] = new_value
         self.epsilon *= self.epsilon_decay
 
-        if len(self.q_table) % 10 == 0:
+        if len(self.q_table) % 100 == 0:
             print(
                 f"\nStates: {len(self.q_table)} | epsilon={self.epsilon:.3f}"
             )
@@ -89,9 +93,9 @@ class FinalAgent(BaseAgent):
 
 
 
-    def make_action(self, state: Tuple[bool, bool, int, int]) -> Optional[Dict[str, Any]]:
+    def make_action(self, state: Tuple[bool, bool, bool, bool, int, int]) -> Optional[Dict[str, Any]]:
 
-        if not self.current_state or self.current_state.get("game_over"):
+        if not self.current_state:
             return None
         
         valid_action_ids = []
@@ -106,8 +110,8 @@ class FinalAgent(BaseAgent):
         if random.random() < self.epsilon:
             action_id = random.choice(valid_action_ids)
 
-            if action_id:
-                logging.info(f"Deliberated action (fallback): {action_id}")
+            #if action_id:
+                #logging.info(f"Deliberated action (fallback): {action_id}")
             return action_id, ACTIONS[action_id]
 
         else:
@@ -118,8 +122,8 @@ class FinalAgent(BaseAgent):
                 key=lambda i: q_values[i]
             )
 
-            if action_id:
-                logging.info(f"Deliberated action (fallback): {action_id}")
+            #if action_id:
+                #logging.info(f"Deliberated action (fallback): {action_id}")
             return action_id, ACTIONS[action_id]
 
 
@@ -173,7 +177,17 @@ class FinalAgent(BaseAgent):
         
         aligned = abs(target_dx) <= 1
 
-        current_state = (has_diving_alien, aligned ,target_dx, target_dy)
+        can_shoot = (
+            {"action": "shoot"} in self.current_state.get("valid_actions", [])
+        )
+
+        danger = (
+            has_diving_alien and
+            abs(target_dx) <= 1 and
+            target_dy <= 3
+        )
+
+        current_state = (has_diving_alien, can_shoot, danger, aligned ,target_dx, target_dy)
 
         result = self.make_action(current_state)
 
@@ -183,14 +197,22 @@ class FinalAgent(BaseAgent):
         action_id, action = result
 
 
+        done = self.current_state.get("game_over")
 
         if self.mode == "train": # --------------------------------------------------
 
-            if self.previous_state is not None:
-                self.previous_score = self.current_state.get("score", 0)
+            if self.new_run:
+                print("\nNumber of the run: ",self.number_of_run)
+                self.new_run = False
 
-                if self.current_state.get("game_over"):
-                    reward -= 500
+            if self.previous_state is not None:
+                lives = self.current_state.get("lives")
+
+                if (lives < self.current_lives) or done:
+                    reward -= 25
+                    self.current_lives = lives
+                    print("\nReduced number of lives to: ",self.current_lives)
+
 
                 match self.previous_action:
                     case 0:
@@ -212,6 +234,10 @@ class FinalAgent(BaseAgent):
                     reward -= 0.1
 
 
+                if has_diving_alien and aligned and self.previous_action == 2:
+                    reward += 2
+
+
                 score = self.current_state.get("score", 0)
                 reward += score - self.previous_score
                 self.previous_score = score
@@ -228,17 +254,33 @@ class FinalAgent(BaseAgent):
             self.previous_state = current_state
             self.previous_action = action_id
 
-            if self.current_state.get("game_over"):
+            if done:
+
+                print("\nENDED THE RUN")
+
+                if self.previous_state is not None:
+                    self.learn(
+                        state=self.previous_state,
+                        action=self.previous_action,
+                        reward=reward,
+                        next_state=current_state,
+                        done=True
+                    )
+
+
                 self.previous_state = None
                 self.previous_action = None
                 self.previous_score = 0
+                self.current_lives = 3
+
                 self.save(self.file)
 
-            #print(
-            #f"player_x={player_x}, "
-            #f"target_dx={target_dx}, "
-            #f"action={action_id}"
-            #)
+                self.number_of_run += 1
+                self.new_run = True
+
+                return None
+
+
             score = self.current_state.get("score", 0)
 
             if score >= 15000:
@@ -271,7 +313,6 @@ def main() -> None:
     agent = FinalAgent()
 
     parser = argparse.ArgumentParser(description='StarWars')
-    parser.add_argument('-e', '--epochs', type=int, default=10)
     parser.add_argument('-m','--gamemode',choices=["train", "play"], required=True)
     parser.add_argument("-o", "--output", type=str, default="agent.pkl", help="Path to save/load the agent")
     
