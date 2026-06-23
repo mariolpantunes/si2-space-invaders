@@ -52,7 +52,7 @@ In a separate terminal (ensure the virtual environment is activated):
   ```
 
 ## Report
-The project report is available in [`docs/report.pdf`](docs/report.pdf).
+The project report is available in [`docs/SI2_SpaceInvaders_115129_114279.pdf`](docs/SI2_SpaceInvaders_115129_114279.pdf).
 
 ## Development
 The project structure:
