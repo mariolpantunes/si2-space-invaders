@@ -1,112 +1,94 @@
-# <img src="server/viewer/favicon.svg" alt="logo" width="128" height="128" align="middle"> SI2 - Space Invaders
+# <img src="server/viewer/favicon.svg" alt="logo" width="128" height="128" align="middle"> SI2 - Space Invaders: Agente Autónomo (NEAT)
 
-# Agente Inteligente para Space Invaders (NEAT)
+- ### Grupo 2 (Francisco Carvalho - 114492; João Viegas - 11)
 
-Este repositório contém a implementação de um agente autónomo para o jogo Space Invaders, desenvolvido para a unidade curricular de Sistemas Inteligentes II. O agente utiliza Neuroevolução (**NEAT**) para dominar o jogo através de sensores customizados e uma função de fitness evolutiva.
+Este repositório contém a implementação de um agente inteligente para o jogo Space Invaders, desenvolvido no âmbito da unidade curricular de Sistemas Inteligentes II. O projeto explora o algoritmo **NEAT** (NeuroEvolution of Augmenting Topologies) para criar um agente capaz de performance sobre-humana através de **Feature Engineering** avançada e **Reward Shaping** incremental.
 
 ## 1. Instruções de Execução
 
 ### Pré-requisitos
-
 - Python 3.10+
-- `pip install -r requirements.txt` (inclui `neat-python`, `numpy` e `matplotlib`)
+- Instalação de dependências: `pip install -r requirements.txt`
 
 ### Como correr o agente
-
-1. Iniciar o servidor:
-
+1. **Iniciar o Servidor:**
    ```bash
    python3 -m server.server
    ```
-
-2. Num novo terminal, carregar o modelo treinado:
-
+2. **Carregar o Agente:**
    ```bash
    python3 -m agents.ml_agent
    ```
-
-*Nota: O agente carrega por defeito o ficheiro `winner.pkl` na raiz do projeto.*
-
----
-
-Durante o desenvolvimento, testámos duas filosofias de design distintas para o cérebro do agente:
-
-### Modelo A: Engenharia de Features (A Nossa Solução Final)
-
-- **Topologia:** 11 inputs, 4 outputs (Oeste, Este, Disparar, Idle), **0 camadas escondidas**.
-- **Inputs (11):** Coordenadas X/Y da nave e lasers; Sensor de Cooldown (disponibilidade de tiro); Ameaça prioritária (alien em *dive* mais baixo); Alvo tático (alien estático mais próximo); Densidade lateral de inimigos.
-- **Justificação:** Ao "mastigar" os dados para a IA (ex: focar no perigo iminente), permitimos que uma rede linear simples atingisse performance máxima com custo computacional mínimo.
-
-### Modelo B: Complexidade Arquitetural (Modelo de Comparação)
-
-- **Topologia:** 2 inputs, 4 outputs, **1 camada escondida com 6 neurónios**.
-- **Inputs (2):** Distância relativa em X entre o alien e a nave ($alien\_x - player\_x$) e a coordenada Y do alien.
-- **Filosofia:** Fornecer dados brutos e deixar que a camada escondida descubra as correlações lógicas (como a necessidade de disparar apenas quando alinhado).
+*Nota: Por defeito, o agente utiliza o ficheiro `winner.pkl` (Versão 4 Final).*
 
 ---
 
-## 3. Funções de Recompensa (Reward Shaping)
+## 2. Estudo de Arquiteturas: Modelo A vs. Modelo B
 
-A evolução do agente A foi dividida em fases de **Fine-Tuning**, onde cada nova versão partia do "campeão" da fase anterior, enquanto que o modelo B, 
+Durante o desenvolvimento, comparámos duas filosofias de design distintas para o "cérebro" da IA:
+
+| Característica | Modelo A (Nossa Solução Final) | Modelo B (Abordagem por Complexidade) |
+| :--- | :--- | :--- |
+| **Topologia** | 11 inputs, 0 camadas escondidas (Linear) | 2 inputs, 1 camada escondida (**6 neurónios**) |
+| **Inputs** | Vetor rico (Cooldown, Posição absoluta, Alvos) | Minimalista (Distância relativa $dx$ e altura $y$) |
+| **Filosofia** | **Feature Engineering**: Informação "mastigada" | **Deep Learning**: Rede descobre as regras |
+| **Performance** | **50.000+ pontos** (Imbatível) | ~20.000 pontos (Instável em RNG extremo) |
+| **Vantagem** | Alta fiabilidade e sem latência de decisão | Convergência rápida em cenários simples |
+
+---
+
+## 3. Funções de Recompensa e Evolução (A "História")
+
+O Agente A foi treinado de forma incremental através de 5 fases de **Fine-Tuning**, partindo do "campeão" da fase anterior para herdar conhecimentos táticos.
 
 ### Fase 0: Modelo Base (`winner_goated_behaviour.pkl`)
-
-O treino inicial focou-se na sobrevivência básica com a função:
+Treino focado em sobrevivência reativa:
 $$Fitness = (Score \times 10) + (Steps \times 0.5) - (VidasPerdidas \times 500)$$
-
-- **Resultado:** O agente aprendeu a caçar aliens em *dive*.
-- **Problema:** O comportamento era passivo. O agente encostava-se ao lado esquerdo quando o ecrã estava seguro, tornando-se vulnerável a ataques vindos do lado oposto.
+*   **Comportamento:** Aprendeu a interceptar aliens em *dive*.
+*   **Problema:** Muito passivo (*Camping*), encostando-se aos cantos e sendo vulnerável a ataques opostos.
 
 ### Fase 1: Paradigma "Speedrun"
-
-Para aumentar a agressividade, mudámos a recompensa de tempo por uma penalização. O objetivo passou a ser limpar a ronda o mais rápido possível.
+Substituição da recompensa de tempo por uma penalização para aumentar a agressividade:
 $$Fitness = (Score \times 10) - (Steps \times k) - (VidasPerdidas \times 500)$$
-
-- Foram testados dois coeficientes: $k=0.75$ e $k=1.0$ (denominados `winner_k_vi.pkl`, sendo $i$ a versão/fase de desenvolvimento).
-- **Resultado:** O agente tornou-se muito mais decisivo nos disparos para "parar o cronómetro".
+*   Testaram-se $k=0.75$ e $k=1.0$. O modelo tornou-se um atirador muito mais rápido.
 
 ### Fase 2: Modo Caçador e Robustez
-
-Introduzimos o bónus por alinhamento com aliens estáticos quando não havia ameaças imediatas e aumentámos o limite de treino para 6000 steps.
-
-- **Objetivo:** Garantir que o agente caça ativamente a "nuvem" de aliens para evitar que estes cheguem a iniciar o modo *dive*.
+Introdução de bónus por alinhamento com aliens estáticos quando o ecrã estava livre de *dives*, e aumento do limite de simulação para **6000 steps**.
+*   **Resultado:** O agente passou a patrulhar ativamente a base para limpar a wave antes dos ataques começarem.
 
 ### Fase 3: Reforço de Prioridades e o Problema do *Jitter*
+Aumento das recompensas de alinhamento ($0.4$ para *divers* e $1.0$ para estáticos).
+*   **Problema:** O modelo de $k=0.75$ desenvolveu um tremor (*jitter*). Como a nave se move de 1 em 1 e os aliens em frações (floats), a IA tentava alinhar-se com casas decimais impossíveis de atingir.
 
-Aumentámos a recompensa de alinhamento ($0.4$ para alvos em *dive* e $1.0$ para estáticos).
-
-- **Problema Detetado:** O modelo de $k=0.75$ começou a "tremer" (oscilação esquerda-direita). Sendo o movimento da nave discreto (inteiros) e o dos aliens contínuo (floats), a IA tentava alinhar-se com casas decimais impossíveis de atingir.
-
-### Fase 4: Discretização e Modelo Final
-
-Aplicámos a função `round()` na posição X dos aliens para o cálculo de distância na função de fitness.
-
-- **Efeito:** O alinhamento passou a ser considerado perfeito assim que o agente entra no mesmo "bloco" que o alien.
-- **Resultado Final:** Eliminação total do tremor, movimentos fluidos e performance imbatível.
-
-### Componentes Dinâmicas
-
-- **Anti-Camping (Mapa de Calor):** Registo de permanência em cada bloco X. Se o agente passar >45% do tempo num único bloco, o fitness total sofre uma penalização de 90%.
-- **Modos de Prioridade:**
-  - **Evasão:** Bónus por distância de aliens em *dive* que estejam abaixo de $Y=4.0$.
-  - **Caçador:** Recompensa de alinhamento com aliens estáticos ($1.0$ por frame) quando não existem ameaças imediatas.
+### Fase 4: Discretização de Alvos (Modelo Final)
+Implementação da função `round()` na posição X dos aliens para o cálculo de distância.
+*   **Resultado Final:** Eliminação total do tremor. O agente considera o alinhamento perfeito assim que entra no mesmo bloco que o alien. **Performance recorde de 50k pontos sem perdas de vida.**
 
 ---
 
-## 4. Avaliação de Performance
+## 4. Análise Técnica do Modelo B (Hidden Layer)
 
-### Resultados Obtidos
+O Modelo B utilizou a topologia de uma camada escondida com 6 neurónios e apenas 2 inputs ($dx, y$). A sua função de fitness foi inspirada na Fase 4 do Modelo A:
+*   Utilização de **Mapa de Calor (Anti-Camping)**: Penalização de 90% no fitness se a permanência num bloco X excedesse 45%.
+*   Priorização de **Zona de Evasão**: Abaixo de $Y=4.0$, prioriza fuga; acima, prioriza tiro.
 
-- **Pontuação Máxima:** 50.000+ pontos.
-- **Consistência:** O agente é capaz de sobreviver a centenas de *waves* consecutivas sem perder vidas, demonstrando uma gestão perfeita de *cooldown* e reflexos preventivos contra ataques diagonais.
+**Conclusão Comparativa:**
+Embora o Modelo B tenha aprendido a lógica de alinhamento e disparo muito rapidamente, a falta de um **Sensor de Cooldown** (presente no Modelo A) tornou-o menos eficiente. O Modelo A, ao ser linear e ter inputs precisos, provou ser superior na gestão da cadência de tiro e na estabilidade de movimento a longo prazo.
 
-### Estudo de Convergência
+---
 
-*(Podes inserir aqui os gráficos gerados pelo script: fitness_meu_modelo.png e comparativo_complexidade.png)*
+## 5. Avaliação de Performance
 
-1. **Convergência:** O modelo atingiu o patamar de estabilidade por volta da geração 80, onde a média da população se aproximou do fitness máximo.
-2. **Eficiência Estrutural:** Ao longo das 100 gerações, observou-se uma redução no número de conexões neurais, provando que o agente aprendeu a ignorar inputs ruidosos e focou-se apenas na lógica crítica de sobrevivência.
+### Resultados
+- **Score Máximo:** > 50.000 pontos.
+- **Consistência:** 100% de sobrevivência em cenários de 3 minutos de RNG intenso.
+- **Eficiência:** Redução de 44 para 16 conexões neurais ao longo do treino (poda por eficiência).
 
-### Comparação de Abordagens
+### Gráficos de Treino
 
-Comparou-se a solução linear (11 inputs) com uma solução de camadas escondidas (2 inputs). A solução linear provou ser mais robusta, atingindo pontuações superiores e movimentos mais fluidos, enquanto a rede com camadas escondidas apresentou maior dificuldade em gerir o cooldown da arma e situações de RNG múltiplo.
+![image](Figure_1.png)
+![image](Figure_2.png)
+![image](Figure_3.png)
+
+1.  **Convergência de Fitness:** Evolução do Fitness Médio vs Máximo.
+2.  **Complexidade Estrutural:** Comparativo do número de conexões (Modelos A vs B).
