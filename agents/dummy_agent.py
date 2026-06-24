@@ -11,6 +11,9 @@ from agents.base_agent import BaseAgent
 
 class DummyAgent(BaseAgent):
     async def deliberate(self) -> Optional[Dict[str, Any]]:
+
+        print("\n",self.current_state)
+
         if not self.current_state or self.current_state.get("game_over"):
             return None
         

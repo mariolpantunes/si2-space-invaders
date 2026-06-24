@@ -63,9 +63,13 @@ async def receive_loop(websocket):
 async def send_loop(websocket):
     fd = sys.stdin.fileno() if (has_termios and termios is not None) else None
     old_settings = None
+
+    
+
     if fd is not None and termios is not None and tty is not None:
         old_settings = termios.tcgetattr(fd)
         tty.setraw(fd)
+
 
     try:
         while True:

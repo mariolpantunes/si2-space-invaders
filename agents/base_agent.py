@@ -20,7 +20,10 @@ class BaseAgent:
     async def run(self) -> None:
         try:
             async with websockets.connect(self.server_uri) as websocket:
-                await websocket.send(json.dumps({"client": "agent"}))
+                await websocket.send(json.dumps({
+                    "client": "agent",
+                    "name": "Dummy Agent"
+                }))
                 logging.info(f"Connected to {self.server_uri}")
 
                 async for message in websocket:

@@ -51,6 +51,9 @@ In a separate terminal (ensure the virtual environment is activated):
   python3 -m agents.manual_agent
   ```
 
+## Report
+The project report is available in [`docs/SI2_SpaceInvaders_115129_114279.pdf`](docs/SI2_SpaceInvaders_115129_114279.pdf).
+
 ## Development
 The project structure:
 - `server/`: Game logic, server implementation, and visualizer assets (inside `server/viewer/`).
