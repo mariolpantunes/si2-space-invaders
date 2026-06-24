@@ -261,7 +261,7 @@ A variável \texttt{danger} resolve este comportamento ao distinguir situações
 
 \subsection{Condição de Paragem por Desempenho}
 
-Durante o treino, o agente monitoriza continuamente a pontuação. Quando esta atinge ou ultrapassa $15\,000$ pontos, o treino é interrompido automaticamente, o modelo é guardado e o processo termina. Esta condição garante que o agente não continue a treinar além do necessário.
+Durante o treino, o agente monitoriza continuamente a pontuação. Quando esta atinge ou ultrapassa $15\,000$ pontos numa sessão, o modelo é guardado automaticamente no final dessa sessão. O utilizador pode então optar por parar o treino ou continuar com novas sessões. Esta condição garante que o agente não continue a treinar além do necessário.
 
 \section{Modos de Operação e Persistência}
 
@@ -293,7 +293,7 @@ Após treino, o agente demonstra um comportamento coerente com os objetivos defi
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{highscore.jpg}
-    \caption{Ecrã de fim de jogo com a pontuação máxima obtida durante o treino (55\,260 pontos, alcançada ao longo de 7 episódios / 21 vidas).}
+    \caption{Ecrã de fim de jogo com a pontuação máxima obtida durante o treino (55\,260 pontos, alcançada ao longo de 7 sessões de treino / 21 vidas).}
     \label{fig:highscore}
 \end{figure}
 
